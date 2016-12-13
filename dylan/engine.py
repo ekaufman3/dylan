@@ -81,3 +81,32 @@ def EuropeanBinomialPricer(pricing_engine, option, data):
     price = disc * payoffT 
      
     return price 
+def AmericanBinomialPricer(pricing_engine, option, data):
+    T = option.expiry
+    K = option.strike
+    (spot, rate, volatility, dividend) = data.get_data()
+    N = pricing_engine.steps
+    nodes = N + 1
+    dt = T/N 
+    u = np.exp((rate * dt) + volatility * np.sqrt(dt)) 
+    d = np.exp((rate * dt) - volatility * np.sqrt(dt))
+    pu = (np.exp(rate * dt) - d) / (u - d)
+    pd = 1 - pu
+    disc = np.exp(-rate * dt)
+    dpu = disc * pu
+    dpd = disc * pd
+    
+    Ct = np.zeros(nodes)
+    St = np.zeros(nodes)
+
+    for i in range(nodes):
+        St[i] = spot * (u ** (N - i)) * (d ** i)
+        Ct[i] = option.payoff(St[i])
+
+    for i in range((N - 1),-1,-1):
+        for j in range(i+1):
+            Ct[j] = dpu * Ct[j] + dpd * Ct[j+1]
+            St[j] = St[j] / u
+            Ct[j] = np.maximum(Ct[j], option.payoff(St[j]))
+
+    return Ct[0]
