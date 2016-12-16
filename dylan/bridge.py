@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 from math import log2, sqrt
+import time
 
 def CallPayoff(S, K):
     return np.maximum(S - K, 0.0)
@@ -28,7 +29,6 @@ def WienerBridge(T, steps, endval = 0.0):
             a = 0.5 * (w[left] + w[right])
             b = 0.5 * sqrt(tjump)
             w[i] = a + b * z[i]
-            ####
             right += ijump + 1
             left += ijump + 1
             i += ijump + 1
@@ -37,24 +37,24 @@ def WienerBridge(T, steps, endval = 0.0):
         tjump /= 2
 
     return w
+  
 
 
 def StratifiedUniformSample(m = 100):
     u = np.random.uniform(size=m)
     i = np.arange(m)
     uhat = (i + u) / m
-
     return uhat
 
 
-def GeometricBrownianMotionBridge(S, mu, v, H, T, steps, reps):
+def GeometricBrownianMotionBridge(S, r, q, v, H, T, steps, reps):
     dt = T / steps
-    nudt = (mu - 0.5 * v * v)*dt
+    nudt = (r - q - 0.5 * v * v)*dt
     spaths = np.zeros((reps, steps+1))
+    spaths[:,0] = S
     uhat = StratifiedUniformSample(reps)
     endval = norm.ppf(uhat)
     sigsdt = v * np.sqrt(dt)
-    barrierCrossed = False
     
     for i in range(reps):
         barrierCrossed = False
@@ -74,10 +74,14 @@ def GeometricBrownianMotionBridge(S, mu, v, H, T, steps, reps):
     
 
 def StratifiedMonteCarloPricer(S, K, r, v, q, T, H, reps, steps):
-    spotT = GeometricBrownianMotionBridge(S, r, v, H, T, steps, reps)
+    
+    start = time.time()
+    spotT = GeometricBrownianMotionBridge(S, r, q, v, H, T, steps, reps)
     callT = CallPayoff(spotT.T[-1], K)
     callPrc = callT.mean() * np.exp(-r * T)
-
-    return callT
-
+    callSE = callT.std(ddof=1) / np.sqrt(reps)
+    end = time.time()
+    stime = end - start
+    MC = (callPrc, callSE, stime)
+    return MC
 
